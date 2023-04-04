@@ -1,10 +1,16 @@
 # The RWKV Language Model (and my LM tricks)
 
-## RWKV: RNN with Transformer-level LLM Performance
+## RWKV: Parallelizable RNN with Transformer-level LLM Performance (pronounced as "RwaKuv", from 4 major params: R W K V)
 
 RWKV is an RNN with Transformer-level LLM performance, which can also be directly trained like a GPT transformer (parallelizable). And it's 100% attention-free. You only need the hidden state at position t to compute the state at position t+1. You can use the "GPT" mode to quickly compute the hidden state for the "RNN" mode.
 
 So it's combining the best of RNN and transformer - **great performance, fast inference, saves VRAM, fast training, "infinite" ctx_len, and free sentence embedding** (using the final hidden state).
+
+HuggingFace Gradio demo (14B ctx8192): https://huggingface.co/spaces/BlinkDL/ChatRWKV-gradio
+
+**Raven** (7B finetuned on Alpaca and more) Demo: https://huggingface.co/spaces/BlinkDL/Raven-RWKV-7B
+
+**ChatRWKV:** with "stream" and "split" strategies and INT8. **3G VRAM is enough to run RWKV 14B :)** https://github.com/BlinkDL/ChatRWKV
 
 **RWKV pip package**: https://pypi.org/project/rwkv/
 
@@ -24,17 +30,19 @@ print(out.detach().cpu().numpy())                   # same result as above
 
 **Download RWKV-4 0.1/0.4/1.5/3/7/14B weights**: https://huggingface.co/BlinkDL
 
+**RWKV introduction, and in 100 lines of numpy**: https://johanwind.github.io/2023/03/23/rwkv_overview.html https://johanwind.github.io/2023/03/23/rwkv_details.html
+
+A cool paper (Spiking Neural Network) using RWKV: https://github.com/ridgerchu/SpikeGPT
+
 ## Join Our Discord: https://discord.gg/bDSBUMeFpc (lots of developers)
 
 **Twitter**: https://twitter.com/BlinkDL_AI
 
 **RWKV in 150 lines** (model, inference, text generation): https://github.com/BlinkDL/ChatRWKV/blob/main/RWKV_in_150_lines.py
 
-**ChatRWKV v2:** with "stream" and "split" strategies and INT8. **3G VRAM is enough to run RWKV 14B :)** https://github.com/BlinkDL/ChatRWKV/tree/main/v2
+ChatRWKV with RWKV 14B ctx8192:
 
 ![RWKV-chat](RWKV-chat.png)
-
-**Hugging Face space**: https://huggingface.co/spaces/BlinkDL/ChatRWKV-gradio
 
 You are welcome to join the RWKV discord https://discord.gg/bDSBUMeFpc to build upon it. We have plenty of potential compute (A100 40Gs) now (thanks to Stability and EleutherAI), so if you have interesting ideas I can run them.
 
@@ -50,7 +58,7 @@ RWKV-3 1.5B on A40 (tf32) = always 0.015 sec/token, tested using simple pytorch 
 
 GPT2-XL 1.3B on A40 (tf32) = 0.032 sec/token (for ctxlen 1000), tested using HF, GPU utilization 45% too (interesting), VRAM 9655M
 
-Training speed: RWKV-4 1.5B BF16 ctxlen1024 = 106K tokens/s on 8xA100 40G. RWKV-4 14B BF16 ctxlen4096 = 110K tokens/s on 8x8 A100 80G (ZERO2+CP).
+Training speed: (new training code) RWKV-4 14B BF16 ctxlen4096 = 114K tokens/s on 8x8 A100 80G (ZERO2+CP). (old training code) RWKV-4 1.5B BF16 ctxlen1024 = 106K tokens/s on 8xA100 40G.
 
 I am doing image experiments too (For example: https://huggingface.co/BlinkDL/clip-guided-binary-autoencoder) and RWKV will be able to do txt2img diffusion :) My idea: 256x256 rgb image -> 32x32x13bit latents -> apply RWKV to compute transition probability for each of the 32x32 grid -> pretend the grids are independent and "diffuse" using these probabilities.
 
@@ -100,6 +108,8 @@ prompt = f'\nQ & A\n\nQuestion:\n{qq}\n\nDetailed Expert Answer:\n' # let the mo
 
 https://pypi.org/project/rwkvstic/ a pip package (with 8bit & offload for low VRAM GPUs)
 
+**https://github.com/saharNooby/rwkv.cpp rwkv.cpp for fast CPU reference**
+
 https://github.com/harrisonvanderbyl/rwkv_chatbot a chatbot
 
 https://github.com/hizkifw/WebChatRWKVstic WebUI (WIP)
@@ -138,6 +148,8 @@ https://github.com/Pathos14489/RWKVDistributedInference RWKV Distributed Inferen
 
 https://github.com/AXKuhta/rwkv-onnx-dml RWKV ONNX
 
+https://github.com/saharNooby/rwkv.cpp FP32, FP16 and quantized INT4 inference for CPU using [ggml](https://github.com/ggerganov/ggml)
+
 ### Inference
 
 **Run RWKV-4 Pile models:** Download models from https://huggingface.co/BlinkDL. Set TOKEN_MODE = 'pile' in run.py and run it. It's fast even on CPU (the default mode).
@@ -149,28 +161,6 @@ Run RWKV-4 Pile models in your browser (and onnx version): see this issue https:
 RWKV-4 Web Demo: https://josephrocca.github.io/rwkv-v4-web/demo/ (note: only greedy sampling for now)
 
 For the old RWKV-2: see the release here for a 27M params model on enwik8 with 0.72 BPC(dev). Run run.py in https://github.com/BlinkDL/RWKV-LM/tree/main/RWKV-v2-RNN. You can even run it in your browser: https://github.com/BlinkDL/AI-Writer/tree/main/docs/eng https://blinkdl.github.io/AI-Writer/eng/ (this is using tf.js WASM single-thread mode).
-
-I'd like to build an almost-INT8 version of RWKV. A simple method to quantize a matrix with outliers:
-```python
-import numpy as npA
-
-# the original M, with outliers
-M = np.array([[1,   2,   1,  2],[2,  100,    2, 10],[1,   2,   1, 2],[2,   1, 20, 1]])
-
-# the scaled M, without outliers
-Q = np.array([[1, 0.2, 0.1,  2],[0.4,  2, 0.04, 2], [1, 0.2, 0.1, 2],[2, 0.1,  2, 1]])
-# we can find optimal a & b to minimize inference error after quantization
-a = np.array([1, 10, 10, 1])
-b = np.array([1, 5, 1, 1])
-
-# test M.v with random v - the results will be the same
-v = np.array([1.23, 5.44, 9.75, 2.98])
-print(M.dot(v))
-print(Q.dot(v * a) * b)
-
-# even better: decompose M.dot(v) as Q.dot(v * a + aa) * b + bb where aa & bb are vectors too
-# and can apply more scaling to achieve W8A8 (example: https://arxiv.org/pdf/2211.10438.pdf)
-```
 
 ### Training / Fine-tuning
 
@@ -190,9 +180,9 @@ python tools/preprocess_data.py --input ./my_data.jsonl --output-prefix ./data/m
 ```
 The jsonl format sample (one line for each document):
 ```
-{"meta": {"ID": 101}, "text": "This is the first document."}
-{"meta": {"ID": 102}, "text": "Hello\nWorld"}
-{"meta": {"ID": 103}, "text": "1+1=2\n1+2=3\n2+2=4"}
+{"text": "This is the first document."}
+{"text": "Hello\nWorld"}
+{"text": "1+1=2\n1+2=3\n2+2=4"}
 ```
 generated by code like this:
 ```
@@ -212,7 +202,9 @@ out.write(ss + "\n")
 
 4. Aside from 2d rotation, we can try other Lie groups such as 3d rotation ( SO(3) ). Non-abelian RWKV lol.
 
-5. RWKV might be great on analog devices (search for Analog Matrix-vector multiplication & Photonic Matrix-vector multiplication). RNN is very hardware-friendly (in-memory processing?). Can be a SNN too (https://github.com/ridgerchu/SpikeGPT). I wonder if it can be optimized for quantum computation.
+5. RWKV might be great on analog devices (search for Analog Matrix-vector multiplication & Photonic Matrix-vector multiplication). The RNN mode is very hardware-friendly (processing-in-memory). Can be a SNN too (https://github.com/ridgerchu/SpikeGPT). I wonder if it can be optimized for quantum computation.
+
+6. Trainable initial hidden state (xx aa bb pp xx).
 
 ### Vision Tasks
 

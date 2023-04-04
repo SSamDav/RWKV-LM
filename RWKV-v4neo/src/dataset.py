@@ -19,22 +19,30 @@ class MyDataset(Dataset):
             self.vocab_size = args.vocab_size
             rank_zero_info(f"Current vocab size = {self.vocab_size} (make sure it's correct)")
 
-            if args.data_file.endswith('/'):
-                d_all = []
-                for p in os.listdir(args.data_file):
-                    if p.endswith(".idx"):
-                        d_all += [p[:-4]]
-                d_all.sort()
-                rank_zero_info(d_all)
-                exit(0)
-            else:
+            if args.my_pile_version == 1:
                 self.data = MMapIndexedDataset(args.data_file)
-                self.data_size = len(self.data._bin_buffer) // 2
+                self.data_size = len(self.data._bin_buffer) // self.data._index._dtype_size
                 rank_zero_info(f"Data has {self.data_size} tokens.")
+            else:
+                data_list = open(args.data_file, "r", encoding='utf-8').read().strip().split('\n')
+                data_list = [i.strip().split(' ') for i in data_list]
+                self.data = []
+                self.data_size = int(data_list[-1][-1])
+                rank_zero_info(f"Data has {self.data_size} chunks.")
+                for d in data_list:
+                    data = MMapIndexedDataset(d[0])
+                    data_size = len(data._bin_buffer) // data._index._dtype_size
+                    assert (data_size - args.ctx_len) == int(d[1])
+                    self.data += [[int(d[-1]), int(d[1]), data]]
+                # rank_zero_info(self.data)
 
             if args.my_qa_mask > 0:
-                self.data_pile = MMapIndexedDataset('/fsx/BlinkDL/pile/pile_20B_tokenizer_text_document')
-                self.data_pile_size = len(self.data_pile._bin_buffer) // 2
+                # self.data_pile = MMapIndexedDataset('/fsx/pile/pile_20B_tokenizer_text_document')
+                self.data_pile = MMapIndexedDataset('/fsx/pile_deduped/pile_0.87_deduped_text_document')
+                self.data_pile_size = len(self.data_pile._bin_buffer) // self.data._index._dtype_size
+            else:
+                self.data_pile = None
+                self.data_pile_size = 0
 
             if args.my_pile_stage > 0:
                 # assert self.data_size == 332115325534 and self.vocab_size == 50277
@@ -160,29 +168,44 @@ class MyDataset(Dataset):
                     if args.my_qa_mask > 0:
                         ii_orig = ii
                         if ii % 2 == 0:
-                            ii = (ii // 2) * args.magic_prime
-                            if args.ctx_len == 1024:
-                                magic_prime = 324331313
-                            elif args.ctx_len == 2048:
-                                magic_prime = 162165671
-                            elif args.ctx_len == 4096:
-                                magic_prime = 81082817
+                            ii = -1
                             data = self.data_pile
                         else:
                             ii = ii // 2
-
-                    factor = (math.sqrt(5) - 1) / 2
-                    factor = int(magic_prime * factor)
-                    i = ((factor * ii * ii * ii) % magic_prime) * ctx_len
-                    if (args.my_qa_mask == 0) or (data == self.data_pile):
-                        i = i + args.my_pile_shift
+                    if data == self.data_pile:
+                        i = np.random.randint(0, self.data_pile_size - req_len)
+                    else:
+                        if ii < args.my_random_steps:
+                            i = np.random.randint(0, self.data_size - req_len)
+                        else:
+                            ii = ii - args.my_random_steps
+                            factor = (math.sqrt(5) - 1) / 2
+                            factor = int(magic_prime * factor)
+                            i = ((factor * ii * ii * ii) % magic_prime) * ctx_len
+                            i = i + args.my_pile_shift
                     # print(f"epoch {epoch} idx {idx} rank {rank}/{world_size} ii {ii} pos {round(i / self.data_size, 3)}")
+                elif args.my_pile_stage == 4:
+                    # cheat: pick a random spot in dataset
+                    if args.my_pile_version == 1:
+                        i = np.random.randint(0, self.data_size - req_len)
+                    else:
+                        i = np.random.randint(0, self.data_size)
                 else:
                     # cheat: pick a random spot in dataset
                     i = np.random.randint(0, self.data_size - req_len)
 
                 if args.data_type == "binidx":
-                    dix = data.get(idx=0, offset=i, length=req_len).astype(int)
+                    if args.my_pile_version == 1:
+                        dix = data.get(idx=0, offset=i, length=req_len).astype(int)
+                    else:
+                        # self.data : cutoff, chunk_count, data
+                        for j in range(len(data)):
+                            if i < data[j][0]:
+                                ii = i
+                                i = (i - (data[j-1][0] if j > 0 else 0)) % data[j][1]
+                                dix = data[j][2].get(idx=0, offset=i, length=req_len).astype(int)
+                                # print(ii, j, i)
+                                break
                 elif args.data_type == "numpy":
                     dix = data[i : i + req_len]
                 else:

@@ -76,12 +76,13 @@ if __name__ == "__main__":
 
     parser.add_argument("--lr_init", default=6e-4, type=float)  # 6e-4 for L12-D768, 4e-4 for L24-D1024, 3e-4 for L24-D2048
     parser.add_argument("--lr_final", default=1e-5, type=float)
-    parser.add_argument("--warmup_steps", default=0, type=int)  # try 50 if you load a model
+    parser.add_argument("--warmup_steps", default=-1, type=int)  # try 50 if you load a model
     parser.add_argument("--beta1", default=0.9, type=float)
     parser.add_argument("--beta2", default=0.99, type=float)  # use 0.999 when your model is close to convergence
     parser.add_argument("--adam_eps", default=1e-8, type=float)
-
     parser.add_argument("--grad_cp", default=0, type=int)  # gradient checkpt: saves VRAM, but slower
+
+    parser.add_argument("--my_pile_version", default=1, type=int)  # my special pile version
     parser.add_argument("--my_pile_stage", default=0, type=int)  # my special pile mode
     parser.add_argument("--my_pile_shift", default=-1, type=int)  # my special pile mode - text shift
     parser.add_argument("--my_pile_edecay", default=0, type=int)
@@ -104,6 +105,7 @@ if __name__ == "__main__":
     parser.add_argument("--load_partial", default=0, type=int)
     parser.add_argument("--magic_prime", default=0, type=int)
     parser.add_argument("--my_qa_mask", default=0, type=int)
+    parser.add_argument("--my_random_steps", default=0, type=int)
     parser.add_argument("--my_testing", default='', type=str)
 
     parser = Trainer.add_argparse_args(parser)
@@ -157,22 +159,38 @@ if __name__ == "__main__":
 
     if args.my_pile_stage > 0:
         magic_prime_bak = args.magic_prime
-        if args.ctx_len == 1024:
-            args.magic_prime = 324331313
-            args.epoch_count = 8043
-        elif args.ctx_len == 2048:
-            args.magic_prime = 162165671
-            args.epoch_count = 4021
-        elif args.ctx_len == 4096:
-            args.magic_prime = 81082817
-            args.epoch_count = 2010
-        if args.my_pile_shift < 0:
+
+        if args.my_pile_version == 1:
             if args.ctx_len == 1024:
-                args.my_pile_shift = 0
+                args.magic_prime = 324331313
+                args.epoch_count = 8043
             elif args.ctx_len == 2048:
-                args.my_pile_shift = 512
+                args.magic_prime = 162165671
+                args.epoch_count = 4021
             elif args.ctx_len == 4096:
-                args.my_pile_shift = 768
+                args.magic_prime = 81082817
+                args.epoch_count = 2010
+            elif args.ctx_len == 8192:
+                args.magic_prime = 40541399
+                args.epoch_count = 1005
+        else:
+            if args.ctx_len == 1024:
+                args.magic_prime = 1670239709
+                args.epoch_count = 41423
+            elif args.ctx_len == 2048:
+                args.magic_prime = 835119767
+                args.epoch_count = 20711
+            elif args.ctx_len == 4096:
+                args.magic_prime = 417559889
+                args.epoch_count = 10355
+            elif args.ctx_len == 6144:
+                args.magic_prime = 278373239
+                args.epoch_count = 6903
+            elif args.ctx_len == 8192:
+                args.magic_prime = 208779911
+                args.epoch_count = 5177
+        if args.my_pile_shift < 0:
+            args.my_pile_shift = 0
 
         if magic_prime_bak > 0:
             args.magic_prime = magic_prime_bak
@@ -199,10 +217,11 @@ if __name__ == "__main__":
                 args.load_model = f"{args.proj_dir}/rwkv-init.pth"
             else:
                 args.load_model = f"{args.proj_dir}/rwkv-{max_p}.pth"
-                if args.my_pile_stage == 2:
-                    args.warmup_steps = 10
-                else:
-                    args.warmup_steps = 30
+                if args.warmup_steps < 0:
+                    if args.my_pile_stage == 2:
+                        args.warmup_steps = 10
+                    else:
+                        args.warmup_steps = 30
             args.epoch_begin = max_p + 1
 
     samples_per_epoch = args.epoch_steps * args.real_bsz

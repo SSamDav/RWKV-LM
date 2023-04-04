@@ -28,6 +28,8 @@ class train_callback(pl.Callback):
         w_step = args.warmup_steps
         if args.lr_final == args.lr_init or args.epoch_count == 0:
             lr = args.lr_init
+            if trainer.global_step < w_step:
+                lr = lr * (0.2 + 0.8 * trainer.global_step / w_step)
         else:
             decay_step = real_step - args.my_pile_edecay * args.epoch_steps
             decay_total = (args.epoch_count - args.my_pile_edecay) * args.epoch_steps
@@ -107,7 +109,7 @@ class train_callback(pl.Callback):
                 trainer.my_wandb.log(lll, step=int(real_step))
             if args.magic_prime > 0:
                 expand_factor = 2 if args.my_qa_mask > 0 else 1
-                if int(real_step) == int(args.magic_prime * expand_factor // args.real_bsz) - 1:
+                if int(real_step) == int(args.magic_prime * expand_factor // args.real_bsz) - 1 + int(args.my_random_steps):
                     to_save_dict = pl_module.state_dict()
                     my_save(
                         to_save_dict,
