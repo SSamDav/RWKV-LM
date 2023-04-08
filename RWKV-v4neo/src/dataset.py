@@ -9,6 +9,28 @@ from torch.utils.data import Dataset
 from pytorch_lightning.utilities import rank_zero_info
 from .binidx import MMapIndexedDataset
 from .utils import MaybeIsPrime
+from pathlib import Path
+
+
+class SyntheticDataset(Dataset):
+    def __init__(self, folder_path: Path, subset: str = 'train'):
+        with open(folder_path / 'vocab.json', 'r') as fp:
+            self.vocab = json.load(fp)
+        
+        with open(folder_path / f'{subset}.json', 'r') as fp:
+            self.dataset = json.load(fp)
+            
+        self.stoi = {i: ch for i, ch in enumerate(self.vocab)}
+
+    def __len__(self):
+        return len(self.dataset)
+    
+    def __getitem__(self, idx):
+        datapoint = [self.stoi[char] for char in self.dataset[idx]]
+        x = torch.tensor(datapoint[:-1], dtype=torch.long)
+        y = torch.tensor(datapoint[1:], dtype=torch.long)
+    
+        return x, y
 
 
 class MyDataset(Dataset):
