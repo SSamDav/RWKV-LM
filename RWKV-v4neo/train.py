@@ -117,6 +117,7 @@ if __name__ == "__main__":
     import numpy as np
     import torch
     from torch.utils.data import DataLoader
+    import deepspeed
     if "deepspeed" in args.strategy:
         import deepspeed
     import pytorch_lightning as pl
@@ -139,7 +140,7 @@ if __name__ == "__main__":
     args.num_sanity_val_steps = 0
     args.check_val_every_n_epoch = int(1e20)
     args.log_every_n_steps = int(1e20)
-    args.max_epochs = -1  # continue forever
+    args.max_epochs = 200  # continue forever
     args.betas = (args.beta1, args.beta2)
     args.real_bsz = int(args.num_nodes) * int(args.devices) * args.micro_bsz
     os.environ["RWKV_T_MAX"] = str(args.ctx_len)
@@ -345,7 +346,5 @@ if __name__ == "__main__":
         trainer.strategy.config["zero_optimization"]["reduce_bucket_size"] = args.ds_bucket_mb * 1000 * 1000
 
     # must set shuffle=False, persistent_workers=False (because worker is in another thread)
-    data_loader = DataLoader(train_data, shuffle=False, pin_memory=True, batch_size=args.micro_bsz, num_workers=1, persistent_workers=False, drop_last=True)
-
-    import pdb; pdb.set_trace()
+    data_loader = DataLoader(train_data, shuffle=True, batch_size=args.micro_bsz, num_workers=1)
     trainer.fit(model, data_loader)
