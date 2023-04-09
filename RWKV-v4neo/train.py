@@ -287,9 +287,9 @@ if __name__ == "__main__":
     ########################################################################################################
 
     from src.trainer import train_callback, generate_init_weight
-    from src.dataset import MyDataset
+    from src.dataset import MyDataset, SyntheticDataset
 
-    train_data = MyDataset(args)
+    train_data = SyntheticDataset(args.data_file)
     args.vocab_size = train_data.vocab_size
 
     if args.data_type == 'wds_img':
@@ -347,4 +347,5 @@ if __name__ == "__main__":
     # must set shuffle=False, persistent_workers=False (because worker is in another thread)
     data_loader = DataLoader(train_data, shuffle=False, pin_memory=True, batch_size=args.micro_bsz, num_workers=1, persistent_workers=False, drop_last=True)
 
+    import pdb; pdb.set_trace()
     trainer.fit(model, data_loader)
