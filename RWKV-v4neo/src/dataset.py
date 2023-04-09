@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 class SyntheticDataset(Dataset):
-    def __init__(self, folder_path: Path | str, subset: str = 'train'):
+    def __init__(self, folder_path, subset: str = 'train'):
         folder_path = Path(folder_path)
         with open(folder_path / 'vocab.json', 'r') as fp:
             self.vocab = json.load(fp)
@@ -21,7 +21,7 @@ class SyntheticDataset(Dataset):
         with open(folder_path / f'{subset}.json', 'r') as fp:
             self.dataset = json.load(fp)
             
-        self.stoi = {i: ch for i, ch in enumerate(self.vocab)}
+        self.stoi = {ch: i for i, ch in enumerate(self.vocab)}
         self.vocab_size = len(self.vocab)
 
     def __len__(self):

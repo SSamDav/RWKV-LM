@@ -15,6 +15,7 @@ class Args:
     number_vocab: int
     seq_length: int
     num_examples: int = 2000
+    num_test_examples: int = 600
     type: str = 'associative_recall'
 
 
@@ -88,7 +89,7 @@ if __name__ == '__main__':
     vocab, dataset = associative_recall(
         parser.number_vocab,
         parser.seq_length,
-        parser.num_examples
+        parser.num_examples + parser.num_test_examples
     )
 
     sub_folder = DATA_FOLDER / f"{parser.type}_{parser.number_vocab}_{parser.seq_length}"
@@ -97,4 +98,7 @@ if __name__ == '__main__':
         json.dump(list(vocab), fp)
 
     with open(sub_folder / 'train.json', 'w') as fp:
-        json.dump([datapoint for datapoint in dataset], fp)
+        json.dump([datapoint for datapoint in dataset[:parser.num_examples]], fp)
+
+    with open(sub_folder / 'test.json', 'w') as fp:
+        json.dump([datapoint for datapoint in dataset[parser.num_examples:]], fp)
