@@ -56,9 +56,9 @@ class MyDataset(Dataset):
                     assert args.magic_prime / dataset_slot > 0.99 and args.magic_prime / dataset_slot <= 1
         elif args.data_type == "numpy":
             if not is_test:
-                self.data = np.load(args.data_file).astype("int")
+                self.data = np.load(args.data_file).astype("int").ravel()
             else:
-                self.data = np.load(args.test_data_file).astype("int")
+                self.data = np.load(args.test_data_file).astype("int").ravel()
                 
             self.vocab_size = args.vocab_size
             rank_zero_info(f"Current vocab size = {self.vocab_size} (make sure it's correct)")

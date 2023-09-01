@@ -146,7 +146,7 @@ class RWKV_TimeMix_RWKV5_Preview(MyModule):
         self.head_size = args.head_size
         self.n_head = args.dim_att // self.head_size
         assert args.dim_att % self.n_head == 0
-        self.head_size_divisor = torch.sqrt(args.head_size)
+        self.head_size_divisor = args.head_size * 0.5
 
         self.chunk_len = 512
         assert args.ctx_len % self.chunk_len == 0
@@ -866,7 +866,7 @@ class RWKV_Synthetic(RWKV):
     
     def on_train_epoch_end(self):
         # log epoch metric
-        self.log('train_acc_epoch', self.train_acc)
+        self.log('train_acc_epoch', self.train_acc, prog_bar=True)
         self.train_acc.reset()
         
     def validation_step(self, batch, batch_idx):
@@ -875,5 +875,5 @@ class RWKV_Synthetic(RWKV):
         self.valid_acc.update(logits.detach().argmax(-1)[:, -1], targets[:, -1])
 
     def on_validation_epoch_end(self, outputs):
-        self.log('valid_acc_epoch', self.valid_acc.compute())
+        self.log('valid_acc_epoch', self.valid_acc.compute(), prog_bar=True)
         self.valid_acc.reset()
