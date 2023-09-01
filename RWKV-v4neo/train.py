@@ -147,7 +147,7 @@ if __name__ == "__main__":
     args.logger = False
     args.gradient_clip_val = 1.0
     args.num_sanity_val_steps = 0
-    args.check_val_every_n_epoch = int(1e20)
+    args.check_val_every_n_epoch = 1
     args.log_every_n_steps = int(1e20)
     args.max_epochs = -1  # continue forever
     args.betas = (args.beta1, args.beta2)
