@@ -874,6 +874,6 @@ class RWKV_Synthetic(RWKV):
         logits = self(idx)
         self.val_acc.update(logits.detach().argmax(-1)[:, -1], targets[:, -1])
 
-    def on_validation_epoch_end(self, outputs):
+    def on_validation_epoch_end(self):
         self.log('valid_acc_epoch', self.valid_acc.compute(), prog_bar=True)
         self.val_acc.reset()
