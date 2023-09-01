@@ -148,7 +148,7 @@ if __name__ == "__main__":
     args.gradient_clip_val = 1.0
     args.num_sanity_val_steps = 0
     args.check_val_every_n_epoch = 1
-    args.log_every_n_steps = int(1e20)
+    args.log_every_n_steps = 10
     args.max_epochs = -1  # continue forever
     args.betas = (args.beta1, args.beta2)
     args.real_bsz = int(args.num_nodes) * int(args.devices) * args.micro_bsz
@@ -371,6 +371,6 @@ if __name__ == "__main__":
     data_loader = DataLoader(train_data, shuffle=False, pin_memory=True, batch_size=args.micro_bsz, num_workers=1, persistent_workers=False, drop_last=True)
     val_loader = None
     if val_data:
-        val_loader =  data_loader = DataLoader(val_data, shuffle=False, pin_memory=True, batch_size=args.micro_bsz, num_workers=1, persistent_workers=False, drop_last=True)
+        val_loader = DataLoader(val_data, shuffle=False, pin_memory=True, batch_size=args.micro_bsz, num_workers=1, persistent_workers=False, drop_last=True)
     
     trainer.fit(model, data_loader, val_loader)
