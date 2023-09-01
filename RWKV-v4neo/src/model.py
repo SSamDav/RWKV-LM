@@ -872,7 +872,7 @@ class RWKV_Synthetic(RWKV):
     def validation_step(self, batch, batch_idx):
         idx, targets = batch
         logits = self(idx)
-        self.valid_acc.update(logits.detach().argmax(-1)[:, -1], targets[:, -1])
+        self.val_acc.update(logits.detach().argmax(-1)[:, -1], targets[:, -1])
 
     def on_validation_epoch_end(self, outputs):
         self.log('valid_acc_epoch', self.valid_acc.compute(), prog_bar=True)
