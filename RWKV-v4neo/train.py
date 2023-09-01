@@ -249,7 +249,7 @@ if __name__ == "__main__":
 #
 # Each "epoch" = {args.epoch_steps} steps, {samples_per_epoch} samples, {tokens_per_epoch} tokens
 #
-# Model = {args.n_layer} n_layer, {args.n_embd} n_embd, {args.ctx_len} ctx_len
+# Model = {args.n_layer} n_layer, {args.n_embd} n_embd, {args.head_size} head_size, {args.ctx_len} ctx_len
 #
 # Adam = lr {args.lr_init} to {args.lr_final}, warmup {args.warmup_steps} steps, beta {args.betas}, eps {args.adam_eps}
 #

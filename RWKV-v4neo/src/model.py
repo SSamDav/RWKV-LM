@@ -787,7 +787,7 @@ class RWKV(pl.LightningModule):
 
 class RWKV_Synthetic(RWKV):
     def __init__(self, args):
-        super().__init__()
+        super().__init__(args)
         self.args = args
         if not hasattr(args, 'dim_att'):
             args.dim_att = args.n_embd
