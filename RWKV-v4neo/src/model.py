@@ -876,4 +876,4 @@ class RWKV_Synthetic(RWKV):
 
     def on_validation_epoch_end(self, outputs):
         self.log('valid_acc_epoch', self.valid_acc.compute(), prog_bar=True)
-        self.valid_acc.reset()
+        self.val_acc.reset()
