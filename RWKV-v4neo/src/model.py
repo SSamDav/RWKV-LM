@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 import pytorch_lightning as pl
+import torchmetrics
 from pytorch_lightning.utilities import rank_zero_info, rank_zero_only
 from pytorch_lightning.strategies import DeepSpeedStrategy
 if importlib.util.find_spec('deepspeed'):
@@ -142,10 +143,10 @@ class RWKV_TimeMix_RWKV5_Preview(MyModule):
         self.args = args
         self.layer_id = layer_id
 
-        self.head_size = 64
+        self.head_size = args.head_size
         self.n_head = args.dim_att // self.head_size
         assert args.dim_att % self.n_head == 0
-        self.head_size_divisor = 8
+        self.head_size_divisor = torch.sqrt(args.head_size)
 
         self.chunk_len = 512
         assert args.ctx_len % self.chunk_len == 0
@@ -783,3 +784,96 @@ class RWKV(pl.LightningModule):
         gc.collect()
         torch.cuda.empty_cache()
         return m
+
+class RWKV_Synthetic(RWKV):
+    def __init__(self, args):
+        super().__init__()
+        self.args = args
+        if not hasattr(args, 'dim_att'):
+            args.dim_att = args.n_embd
+        if not hasattr(args, 'dim_ffn'):
+            args.dim_ffn = args.n_embd * 4
+        if not hasattr(args, 'tiny_att_layer'):
+            args.tiny_att_layer = -1
+        if not hasattr(args, 'tiny_att_dim'):
+            args.tiny_att_dim = -1
+            
+        assert args.n_embd % 32 == 0
+        assert args.dim_att % 32 == 0
+        assert args.dim_ffn % 32 == 0
+
+        self.emb = nn.Embedding(args.vocab_size, args.n_embd)
+
+        self.blocks = nn.ModuleList([Block(args, i) for i in range(args.n_layer)])
+
+        self.ln_out = nn.LayerNorm(args.n_embd)
+        self.head = nn.Linear(args.n_embd, args.vocab_size, bias=False)
+        self.train_acc = torchmetrics.classification.Accuracy(task="multiclass", num_classes=args.vocab_size)
+        self.val_acc = torchmetrics.classification.Accuracy(task="multiclass", num_classes=args.vocab_size)
+        
+
+        if args.head_qk > 0:
+            self.head_q = nn.Linear(args.n_embd, args.head_qk, bias=False)
+            self.head_k = nn.Linear(args.n_embd, args.head_qk, bias=False)
+            self.register_buffer("copy_mask", torch.tril(torch.ones(args.ctx_len, args.ctx_len)))
+        if args.dropout > 0:
+            self.drop0 = nn.Dropout(p = args.dropout)
+        
+    def training_step(self, batch, batch_idx):
+        args = self.args
+        if args.my_qa_mask != 1:
+            idx, targets = batch
+            logits = self(idx)
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+            # if '0' in os.environ["RWKV_MY_TESTING"]:
+            #     print('logits', logits)
+            #     torch.set_printoptions(threshold=10000)
+            #     print('idx', idx)
+            #     exit(0)
+        else:
+            idx, targets, mask = batch
+            mask = mask.view(-1)
+            sum_mask = torch.sum(mask).item()
+            # if sum_mask == 0:
+            #     return torch.tensor([0.0], requires_grad=True)
+
+            logits = self(idx)
+            if sum_mask == mask.shape[0]:
+                loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+                # print('rank', self.global_rank, 'loss', loss.item())
+            else:
+                loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), reduction='none')
+                # loss_raw = loss
+                loss = torch.sum(loss * mask) / sum_mask
+
+                # torch.set_printoptions(threshold=10000)
+                # if True: #self.global_rank == 1:
+                #     tmp = ''
+                #     sss = 0
+                #     ccc = 0
+                #     for i in range(mask.shape[0]):
+                #         if mask[i] > 0:
+                #             tmp += str(idx.view(-1)[i].item()) + ','
+                #             sss += loss_raw.view(-1)[i].float().item()
+                #             ccc += 1
+                #     print('rank', self.global_rank, 'loss', loss.item(), 'lavg', sss / ccc)#, 'tmp', tmp, 'input', idx)
+                
+         # log step metric
+        self.train_acc(logits.detach().argmax(-1)[:, -1], targets[:, -1])
+        self.log('train_acc_step', self.train_acc)
+
+        return L2Wrap.apply(loss, logits)
+    
+    def on_train_epoch_end(self):
+        # log epoch metric
+        self.log('train_acc_epoch', self.train_acc)
+        self.train_acc.reset()
+        
+    def validation_step(self, batch, batch_idx):
+        idx, targets = batch
+        logits = self(idx)
+        self.valid_acc.update(logits.detach().argmax(-1)[:, -1], targets[:, -1])
+
+    def on_validation_epoch_end(self, outputs):
+        self.log('valid_acc_epoch', self.valid_acc.compute())
+        self.valid_acc.reset()

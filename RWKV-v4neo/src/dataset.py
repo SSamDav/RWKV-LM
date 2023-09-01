@@ -12,7 +12,7 @@ from .utils import MaybeIsPrime
 
 
 class MyDataset(Dataset):
-    def __init__(self, args):
+    def __init__(self, args, is_test=False):
         self.args = args
 
         if args.data_type == "binidx":
@@ -55,7 +55,11 @@ class MyDataset(Dataset):
                     assert args.magic_prime % 3 == 2
                     assert args.magic_prime / dataset_slot > 0.99 and args.magic_prime / dataset_slot <= 1
         elif args.data_type == "numpy":
-            self.data = np.load(args.data_file).astype("int")
+            if not is_test:
+                self.data = np.load(args.data_file).astype("int")
+            else:
+                self.data = np.load(args.test_data_file).astype("int")
+                
             self.vocab_size = args.vocab_size
             rank_zero_info(f"Current vocab size = {self.vocab_size} (make sure it's correct)")
             self.data_size = len(self.data)

@@ -58,6 +58,7 @@ if __name__ == "__main__":
     parser.add_argument("--random_seed", default="-1", type=int)
 
     parser.add_argument("--data_file", default="", type=str)
+    parser.add_argument("--test_data_file", default="", type=str)
     parser.add_argument("--data_type", default="utf-8", type=str)
     parser.add_argument("--vocab_size", default=0, type=int)  # vocab_size = 0 means auto (for char-level LM and .txt data)
 
@@ -70,6 +71,7 @@ if __name__ == "__main__":
     parser.add_argument("--micro_bsz", default=12, type=int)  # micro batch size (batch size per GPU)
     parser.add_argument("--n_layer", default=6, type=int)
     parser.add_argument("--n_embd", default=512, type=int)
+    parser.add_argument("--head_size", default=64, type=int)
     parser.add_argument("--dim_att", default=0, type=int)
     parser.add_argument("--dim_ffn", default=0, type=int)
     parser.add_argument("--pre_ffn", default=0, type=int)  # replace first att layer by ffn (sometimes better)
@@ -299,11 +301,18 @@ if __name__ == "__main__":
     from src.dataset import MyDataset
 
     train_data = MyDataset(args)
+    val_data = None
     args.vocab_size = train_data.vocab_size
+    
+    if args.test_data_file:
+        val_data = MyDataset(args, is_test=True)
 
     if args.data_type == 'wds_img':
         from src.model_img import RWKV_IMG
         model = RWKV_IMG(args)
+    elif args.data_type == 'numpy':
+        from src.model import RWKV_Synthetic
+        model = RWKV_Synthetic(args)
     else:
         from src.model import RWKV
         model = RWKV(args)
@@ -360,5 +369,8 @@ if __name__ == "__main__":
 
     # must set shuffle=False, persistent_workers=False (because worker is in another thread)
     data_loader = DataLoader(train_data, shuffle=False, pin_memory=True, batch_size=args.micro_bsz, num_workers=1, persistent_workers=False, drop_last=True)
-
-    trainer.fit(model, data_loader)
+    val_loader = None
+    if val_data:
+        val_loader =  data_loader = DataLoader(val_data, shuffle=False, pin_memory=True, batch_size=args.micro_bsz, num_workers=1, persistent_workers=False, drop_last=True)
+    
+    trainer.fit(model, data_loader, val_loader)
