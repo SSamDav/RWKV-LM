@@ -115,6 +115,9 @@ class MyDataset(Dataset):
             self.itos = {i: ch for i, ch in enumerate(unique)}
 
     def __len__(self):
+        if self.args.data_type == "icl":
+            return len(self.data)
+        
         return self.args.epoch_steps * self.args.micro_bsz
 
     def __getitem__(self, idx):
