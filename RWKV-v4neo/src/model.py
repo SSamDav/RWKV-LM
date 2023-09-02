@@ -917,6 +917,10 @@ class RWKV_Synthetic(RWKV):
     def validation_step(self, batch, batch_idx):
         idx, targets = batch
         logits = self(idx)
+        
+        loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1)).detach()
+        self.log("valid_loss", loss, on_step=True, on_epoch=False, prog_bar=True, logger=True)
+        
         self.val_acc.update(logits.detach().argmax(-1)[:, -1], targets[:, -1])
 
     def on_validation_epoch_end(self):
