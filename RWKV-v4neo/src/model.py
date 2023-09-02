@@ -905,13 +905,14 @@ class RWKV_Synthetic(RWKV):
                 
          # log step metric
         self.train_acc(logits.detach().argmax(-1)[:, -1], targets[:, -1])
-        self.log('train_acc_step', self.train_acc)
+        self.log('train_acc', self.train_acc, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log("train_loss", loss, on_step=True, on_epoch=False, prog_bar=True, logger=True)
 
         return L2Wrap.apply(loss, logits)
     
     def on_train_epoch_end(self):
         # log epoch metric
-        self.log('train_acc_epoch', self.train_acc.compute(), prog_bar=True, logger=True)
+        # self.log('train_acc_epoch', self.train_acc.compute(), prog_bar=True, logger=True)
         self.train_acc.reset()
         
     def validation_step(self, batch, batch_idx):
@@ -919,10 +920,11 @@ class RWKV_Synthetic(RWKV):
         logits = self(idx)
         
         loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1)).detach()
-        self.log("valid_loss", loss, on_step=True, on_epoch=False, prog_bar=True, logger=True)
+        self.log("val_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         
-        self.val_acc.update(logits.detach().argmax(-1)[:, -1], targets[:, -1])
+        self.val_acc(logits.detach().argmax(-1)[:, -1], targets[:, -1])
+        self.log('val_acc', self.val_acc.compute(), on_step=True, on_epoch=True, prog_bar=True, logger=True)
 
     def on_validation_epoch_end(self):
-        self.log('valid_acc_epoch', self.val_acc.compute(), prog_bar=True, logger=True)
+        #self.log('valid_acc_epoch', self.val_acc.compute(), prog_bar=True, logger=True)
         self.val_acc.reset()
