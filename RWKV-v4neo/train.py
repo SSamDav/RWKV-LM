@@ -146,6 +146,7 @@ if __name__ == "__main__":
     args.replace_sampler_ddp = False
     args.logger = False
     if args.wandb:
+        from pytorch_lightning.loggers import WandbLogger
         args.logger = WandbLogger(project=args.wandb)
         
     args.gradient_clip_val = 1.0
@@ -303,7 +304,6 @@ if __name__ == "__main__":
     ########################################################################################################
 
     from src.trainer import train_callback, generate_init_weight
-    from pytorch_lightning.loggers import WandbLogger
     from src.dataset import MyDataset
 
     train_data = MyDataset(args)
