@@ -145,6 +145,9 @@ if __name__ == "__main__":
     args.enable_checkpointing = False
     args.replace_sampler_ddp = False
     args.logger = False
+    if args.wandb:
+        args.logger = WandbLogger(project=args.wandb)
+        
     args.gradient_clip_val = 1.0
     args.num_sanity_val_steps = 0
     args.check_val_every_n_epoch = 1
@@ -300,6 +303,7 @@ if __name__ == "__main__":
     ########################################################################################################
 
     from src.trainer import train_callback, generate_init_weight
+    from pytorch_lightning.loggers import WandbLogger
     from src.dataset import MyDataset
 
     train_data = MyDataset(args)
@@ -351,9 +355,10 @@ if __name__ == "__main__":
                 load_dict[k] = model.state_dict()[k]
     model.load_state_dict(load_dict)
 
+   
     trainer = Trainer.from_argparse_args(
         args,
-        callbacks=[train_callback(args)],
+        #callbacks=[train_callback(args)],
     )
 
     if trainer.global_rank == 0:
