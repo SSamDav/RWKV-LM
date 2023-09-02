@@ -834,6 +834,8 @@ class RWKV_Synthetic(RWKV):
     def __init__(self, args):
         super().__init__(args)
         self.args = args
+        self.save_hyperparameters()
+        
         if not hasattr(args, 'dim_att'):
             args.dim_att = args.n_embd
         if not hasattr(args, 'dim_ffn'):
@@ -905,8 +907,8 @@ class RWKV_Synthetic(RWKV):
                 
          # log step metric
         self.train_acc(logits.detach().argmax(-1)[:, -1], targets[:, -1])
-        self.log('train_acc', self.train_acc, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-        self.log("train_loss", loss, on_step=True, on_epoch=False, prog_bar=True, logger=True)
+        self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log('train_acc', self.train_acc, on_step=False, on_epoch=True, prog_bar=True, logger=True)
 
         return L2Wrap.apply(loss, logits)
     
@@ -923,7 +925,7 @@ class RWKV_Synthetic(RWKV):
         self.log("val_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         
         self.val_acc(logits.detach().argmax(-1)[:, -1], targets[:, -1])
-        self.log('val_acc', self.val_acc.compute(), on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log('val_acc', self.val_acc.compute(), on_step=False, on_epoch=True, prog_bar=True, logger=True)
 
     def on_validation_epoch_end(self):
         #self.log('valid_acc_epoch', self.val_acc.compute(), prog_bar=True, logger=True)
