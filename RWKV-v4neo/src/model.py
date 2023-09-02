@@ -911,7 +911,7 @@ class RWKV_Synthetic(RWKV):
     
     def on_train_epoch_end(self):
         # log epoch metric
-        self.log('train_acc_epoch', self.train_acc.compute(), prog_bar=True)
+        self.log('train_acc_epoch', self.train_acc.compute(), prog_bar=True, logger=True)
         self.train_acc.reset()
         
     def validation_step(self, batch, batch_idx):
@@ -924,5 +924,5 @@ class RWKV_Synthetic(RWKV):
         self.val_acc.update(logits.detach().argmax(-1)[:, -1], targets[:, -1])
 
     def on_validation_epoch_end(self):
-        self.log('valid_acc_epoch', self.val_acc.compute(), prog_bar=True)
+        self.log('valid_acc_epoch', self.val_acc.compute(), prog_bar=True, logger=True)
         self.val_acc.reset()
