@@ -55,15 +55,24 @@ class MyDataset(Dataset):
                     assert args.magic_prime % 3 == 2
                     assert args.magic_prime / dataset_slot > 0.99 and args.magic_prime / dataset_slot <= 1
         elif args.data_type == "numpy":
-            if not is_test:
-                self.data = np.load(args.data_file).astype("int").ravel()
-            else:
-                self.data = np.load(args.test_data_file).astype("int").ravel()
+            self.data = np.load(args.data_file).astype("int")
                 
             self.vocab_size = args.vocab_size
             rank_zero_info(f"Current vocab size = {self.vocab_size} (make sure it's correct)")
             self.data_size = len(self.data)
             rank_zero_info(f"Data has {self.data_size} tokens.")
+            
+        elif args.data_type == "icl":
+            if not is_test:
+                self.data = np.load(args.data_file).astype("int")
+            else:
+                self.data = np.load(args.test_data_file).astype("int")
+    
+            self.vocab_size = args.vocab_size
+            rank_zero_info(f"Current vocab size = {self.vocab_size} (make sure it's correct)")
+            self.data_size = len(self.data)
+            rank_zero_info(f"Data has {self.data_size} tokens.")
+            
         elif args.data_type == "uint16":
             self.data = np.fromfile(args.data_file, dtype=np.uint16).astype("int32").reshape(-1, args.my_sample_len)
             self.vocab_size = args.vocab_size
@@ -194,7 +203,8 @@ class MyDataset(Dataset):
                     # print(f"epoch {epoch} idx {idx} rank {rank}/{world_size} ii {ii} pos {round(i / self.data_size, 3)}")
                 else:
                     # cheat: pick a random spot in dataset
-                    i = np.random.randint(0, self.data_size - req_len)
+                    if args.data_type != "icl":
+                        i = np.random.randint(0, self.data_size - req_len)
 
                 if args.data_type == "binidx":
                     if args.my_pile_version == 1:
@@ -210,6 +220,9 @@ class MyDataset(Dataset):
                                 break
                 elif args.data_type == "numpy":
                     dix = data[i : i + req_len]
+                elif args.data_type == "icl":
+                    dix = data[idx, :]
+                    
                 else:
                     dix = [self.stoi[s] for s in data[i : i + req_len]]
 
