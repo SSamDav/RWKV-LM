@@ -147,9 +147,7 @@ if __name__ == "__main__":
     args.logger = False
     if args.wandb:
         from pytorch_lightning.loggers import WandbLogger
-        wandb_logger= WandbLogger(project=args.wandb)
-        wandb_logger.experiment.config.update(vars(args))
-        args.logger = wandb_logger
+        args.logger = WandbLogger(project=args.wandb)
         
     args.gradient_clip_val = 1.0
     args.num_sanity_val_steps = 0
