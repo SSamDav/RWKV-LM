@@ -871,7 +871,7 @@ class RWKV_Synthetic(RWKV):
         if args.my_qa_mask != 1:
             idx, targets = batch
             logits = self(idx)
-            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), reduction='none')
             mask = torch.zeros_like(targets)
             mask[:, -1] = 1
             mask = mask.view(-1)
