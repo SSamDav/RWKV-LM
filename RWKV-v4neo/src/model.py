@@ -872,6 +872,10 @@ class RWKV_Synthetic(RWKV):
             idx, targets = batch
             logits = self(idx)
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+            mask = torch.zeros_like(targets)
+            mask[:, -1] = 1
+            mask = mask.view(-1)
+            loss = torch.sum(loss * mask) / mask.sum(-1)
             # if '0' in os.environ["RWKV_MY_TESTING"]:
             #     print('logits', logits)
             #     torch.set_printoptions(threshold=10000)
