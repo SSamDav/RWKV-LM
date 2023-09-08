@@ -926,6 +926,11 @@ class RWKV_Synthetic(RWKV):
         logits = self(idx)
         
         loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1)).detach()
+        mask = torch.zeros_like(targets)
+        mask[:, -1] = 1
+        mask = mask.view(-1)
+        loss = torch.sum(loss * mask) / mask.sum(-1)
+        
         self.log("val_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         
         self.val_acc(logits.detach().argmax(-1)[:, -1], targets[:, -1])
