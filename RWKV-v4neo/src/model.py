@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 import pytorch_lightning as pl
-import torchmetrics
+import torchmetrics.functional as tm_f
 from pytorch_lightning.utilities import rank_zero_info, rank_zero_only
 from pytorch_lightning.strategies import DeepSpeedStrategy
 if importlib.util.find_spec('deepspeed'):
@@ -830,6 +830,13 @@ class RWKV(pl.LightningModule):
         torch.cuda.empty_cache()
         return m
 
+def accuracy_ignore_index(logits, y, ignore_index=-100):
+    num_classes = logits.shape[-1]
+    preds = torch.argmax(logits, dim=-1)
+    logits = logits.view(-1, logits.shape[-1])
+    y = y.view(-1)
+    return tm_f.classification.accuracy(preds, y, 'multiclass', num_classes=num_classes, ignore_index=ignore_index, average='micro')
+
 class RWKV_Synthetic(RWKV):
     def __init__(self, args):
         super().__init__(args)
@@ -855,8 +862,6 @@ class RWKV_Synthetic(RWKV):
 
         self.ln_out = nn.LayerNorm(args.n_embd)
         self.head = nn.Linear(args.n_embd, args.vocab_size, bias=False)
-        self.train_acc = torchmetrics.classification.Accuracy(task="multiclass", num_classes=args.vocab_size)
-        self.val_acc = torchmetrics.classification.Accuracy(task="multiclass", num_classes=args.vocab_size)
         
 
         if args.head_qk > 0:
@@ -871,11 +876,11 @@ class RWKV_Synthetic(RWKV):
         if args.my_qa_mask != 1:
             idx, targets = batch
             logits = self(idx)
-            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), reduction='none')
-            mask = torch.zeros_like(targets)
-            mask[:, -1] = 1
-            mask = mask.view(-1)
-            loss = torch.sum(loss * mask) / mask.sum(-1)
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1)) # , reduction='none'
+            # mask = torch.zeros_like(targets)
+            # mask[:, -1] = 1
+            # mask = mask.view(-1)
+            # loss = torch.sum(loss * mask) / mask.sum(-1)
             # if '0' in os.environ["RWKV_MY_TESTING"]:
             #     print('logits', logits)
             #     torch.set_printoptions(threshold=10000)
@@ -910,32 +915,23 @@ class RWKV_Synthetic(RWKV):
                 #     print('rank', self.global_rank, 'loss', loss.item(), 'lavg', sss / ccc)#, 'tmp', tmp, 'input', idx)
                 
          # log step metric
-        self.train_acc(logits.detach().argmax(-1)[:, -1], targets[:, -1])
+         
+        train_acc = accuracy_ignore_index(logits.detach()[:, -1, :], targets[:, -1])
         self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-        self.log('train_acc', self.train_acc, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log('train_acc', train_acc, on_step=False, on_epoch=True, prog_bar=True, logger=True)
 
         return L2Wrap.apply(loss, logits)
-    
-    def on_train_epoch_end(self):
-        # log epoch metric
-        # self.log('train_acc_epoch', self.train_acc.compute(), prog_bar=True, logger=True)
-        self.train_acc.reset()
         
     def validation_step(self, batch, batch_idx):
         idx, targets = batch
         logits = self(idx)
         
         loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1)).detach()
-        mask = torch.zeros_like(targets)
-        mask[:, -1] = 1
-        mask = mask.view(-1)
-        loss = torch.sum(loss * mask) / mask.sum(-1)
+        # mask = torch.zeros_like(targets)
+        # mask[:, -1] = 1
+        # mask = mask.view(-1)
+        # loss = torch.sum(loss * mask) / mask.sum(-1)
         
+        val_acc = accuracy_ignore_index(logits.detach()[:, -1, :], targets[:, -1])
         self.log("val_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-        
-        self.val_acc(logits.detach().argmax(-1)[:, -1], targets[:, -1])
-        self.log('val_acc', self.val_acc.compute(), on_step=False, on_epoch=True, prog_bar=True, logger=True)
-
-    def on_validation_epoch_end(self):
-        #self.log('valid_acc_epoch', self.val_acc.compute(), prog_bar=True, logger=True)
-        self.val_acc.reset()
+        self.log('val_acc', val_acc, on_step=False, on_epoch=True, prog_bar=True, logger=True)

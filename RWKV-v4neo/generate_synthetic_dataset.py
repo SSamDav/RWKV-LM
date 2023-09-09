@@ -39,8 +39,11 @@ def generate_associative_recall_datapoint(
     vocab_size,
     sequence_length
 ):
+    sequence_length = sequence_length - 1 # the last datapoint is sample from the generated keys
     mapping = {i: np.random.randint(vocab_size // 2, vocab_size) for i in range(vocab_size // 2)}
     sequence = np.random.randint(vocab_size // 2, size=sequence_length // 2)
+    # sampling a key from the used ones
+    sequence = np.concatenate((sequence, np.array([np.random.choice(sequence)])))
     mapped_sequence = np.vectorize(lambda x: mapping[x])(sequence)
     
     return np.stack([sequence, mapped_sequence]).T.ravel()

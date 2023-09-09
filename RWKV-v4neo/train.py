@@ -381,3 +381,4 @@ if __name__ == "__main__":
         val_loader = DataLoader(val_data, shuffle=False, pin_memory=True, batch_size=args.micro_bsz, num_workers=1, persistent_workers=False, drop_last=True)
     
     trainer.fit(model, data_loader, val_loader)
+    torch.save(model.state_dict(), args.load_model)

@@ -14,6 +14,7 @@ from .utils import MaybeIsPrime
 class MyDataset(Dataset):
     def __init__(self, args, is_test=False):
         self.args = args
+        self.is_test = is_test
 
         if args.data_type == "binidx":
             self.vocab_size = args.vocab_size
@@ -252,6 +253,9 @@ class MyDataset(Dataset):
 
                 x = torch.tensor(dix[:-1], dtype=torch.long)
                 y = torch.tensor(dix[1:], dtype=torch.long)
+                
+                if args.data_type == "icl" and self.is_test:
+                    y[:-1] = -100
 
                 # if ii_orig < 50:
                 #     # if rank == 1:
