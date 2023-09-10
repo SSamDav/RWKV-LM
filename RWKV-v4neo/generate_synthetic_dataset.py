@@ -1,3 +1,4 @@
+from collections import Counter
 import numpy as np
 from argparse import ArgumentParser
 from pathlib import Path
@@ -35,6 +36,35 @@ def generate_associative_recall(
         (ROOT_FOLDER / f"assoc_recall_{vocab_size}_{sequence_length}_{test_size}_test.npy").as_posix()
     ))
     
+def generate_majority(
+    vocab_size,
+    sequence_length,
+    train_size,
+    test_size
+):  
+    train_dataset, test_dataset = [], []
+    for _ in trange(train_size, desc="Generating training dataset."):
+        train_dataset.append(
+            generate_majority_datapoint(vocab_size=vocab_size, sequence_length=sequence_length)
+        )
+        
+    train_dataset = np.stack(train_dataset)
+        
+    for _ in trange(test_size, desc="Generating test dataset."):
+        test_dataset.append(
+            generate_majority_datapoint(vocab_size=vocab_size, sequence_length=sequence_length)
+        )
+        
+    test_dataset = np.stack(test_dataset)
+    
+    np.save(ROOT_FOLDER / f"majority_{vocab_size}_{sequence_length}_{train_size}_train.npy", train_dataset)
+    np.save(ROOT_FOLDER / f"majority_{vocab_size}_{sequence_length}_{test_size}_test.npy", test_dataset)
+    
+    print("Saved files:\n\t- {}\n\t- {}".format(
+        (ROOT_FOLDER / f"majority_{vocab_size}_{sequence_length}_{train_size}_train.npy").as_posix(),
+        (ROOT_FOLDER / f"majority_{vocab_size}_{sequence_length}_{test_size}_test.npy").as_posix()
+    ))
+    
 def generate_associative_recall_datapoint(
     vocab_size,
     sequence_length
@@ -47,6 +77,17 @@ def generate_associative_recall_datapoint(
     mapped_sequence = np.vectorize(lambda x: mapping[x])(sequence)
     
     return np.stack([sequence, mapped_sequence]).T.ravel()
+
+
+def generate_majority_datapoint(
+    vocab_size,
+    sequence_length
+):
+    sequence_length = sequence_length - 2 # the last datapoint is sample from the generated keys
+    sequence = np.random.randint(1, vocab_size, size=sequence_length)
+    most_common = Counter(sequence).most_common(1)[0][0]
+    return np.concatenate((sequence, np.array([0 , most_common])))
+        
 
 
 if __name__ == "__main__":
@@ -64,6 +105,13 @@ if __name__ == "__main__":
     
     if args.dataset_type == "associative-recall":
         generate_associative_recall(
+            vocab_size=args.vocab_size,
+            sequence_length=args.sequence_length,
+            train_size=args.train_size,
+            test_size=args.test_size,
+        )
+    elif args.dataset_type == "majority":
+        generate_majority(
             vocab_size=args.vocab_size,
             sequence_length=args.sequence_length,
             train_size=args.train_size,
